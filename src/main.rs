@@ -37,6 +37,13 @@ fn run() -> Result<()> {
                 .value_name("FILE"),
         )
         .arg(
+            Arg::with_name("output")
+                .help("Output Rust file")
+                .short("o")
+                .takes_value(true)
+                .value_name("FILE"),
+        )
+        .arg(
             Arg::with_name("target")
                 .long("target")
                 .help("Target architecture")
@@ -80,10 +87,16 @@ fn run() -> Result<()> {
 
     let nightly = matches.is_present("nightly_features");
 
+    let output_file_name = if let Some(path) = matches.value_of("output") {
+        path
+    } else {
+        "lib.rs"
+    };
+
     let mut device_x = String::new();
     let items = generate::device::render(&device, target, nightly, &mut device_x)?;
 
-    writeln!(File::create("lib.rs").unwrap(), "{}", quote!(#(#items)*)).unwrap();
+    writeln!(File::create(output_file_name).unwrap(), "{}", quote!(#(#items)*)).unwrap();
 
     if target == Target::CortexM {
         writeln!(File::create("device.x").unwrap(), "{}", device_x).unwrap();
