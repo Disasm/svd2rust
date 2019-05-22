@@ -434,14 +434,14 @@ extern crate quote;
 extern crate svd_parser as svd;
 extern crate syn;
 
-mod errors;
+pub mod errors;
 mod generate;
 mod util;
 
 pub use crate::util::Target;
 
 pub struct Generation {
-    pub lib_rs: String,
+    pub code: String,
     pub device_specific: Option<DeviceSpecific>,
 
     // Reserve the right to add more fields to this struct
@@ -456,31 +456,22 @@ pub struct DeviceSpecific {
     _extensible: (),
 }
 
-type Result<T> = std::result::Result<T, SvdError>;
-#[derive(Debug)]
-pub enum SvdError {
-    Fmt,
-    Render,
-}
-
 /// Generates rust code for the specified svd content.
-pub fn generate(xml: &str, target: Target, nightly: bool) -> Result<Generation> {
+pub fn generate(xml: &str, target: Target, nightly: bool) -> errors::Result<Generation> {
     use std::fmt::Write;
 
     let device = svd::parse(xml);
     let mut device_x = String::new();
-    let items = generate::device::render(&device, target, nightly, &mut device_x)
-        .or(Err(SvdError::Render))?;
+    let items = generate::device::render(&device, target, nightly, &mut device_x)?;
 
-    let mut lib_rs = String::new();
+    let mut code = String::new();
     writeln!(
-        &mut lib_rs,
+        &mut code,
         "{}",
         quote! {
             #(#items)*
         }
-    )
-    .or(Err(SvdError::Fmt))?;
+    ).unwrap();
 
     let device_specific = if device_x.is_empty() {
         None
@@ -493,7 +484,7 @@ pub fn generate(xml: &str, target: Target, nightly: bool) -> Result<Generation> 
     };
 
     Ok(Generation {
-        lib_rs,
+        code,
         device_specific,
         _extensible: (),
     })

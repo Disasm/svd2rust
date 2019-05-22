@@ -3,17 +3,11 @@
 extern crate cast;
 extern crate clap;
 extern crate either;
-#[macro_use]
 extern crate error_chain;
 extern crate inflections;
-#[macro_use]
 extern crate quote;
 extern crate svd_parser as svd;
 extern crate syn;
-
-mod errors;
-mod generate;
-mod util;
 
 use std::fs::File;
 use std::io::{self, Write};
@@ -21,8 +15,8 @@ use std::process;
 
 use clap::{App, Arg};
 
-use crate::errors::*;
-use crate::util::{build_rs, Target};
+use svd2rust::errors::*;
+use svd2rust::{Target, generate};
 
 fn run() -> Result<()> {
     use std::io::Read;
@@ -83,8 +77,6 @@ fn run() -> Result<()> {
         }
     }
 
-    let device = svd::parse(xml);
-
     let nightly = matches.is_present("nightly_features");
 
     let output_file_name = if let Some(path) = matches.value_of("output") {
@@ -93,14 +85,13 @@ fn run() -> Result<()> {
         "lib.rs"
     };
 
-    let mut device_x = String::new();
-    let items = generate::device::render(&device, target, nightly, &mut device_x)?;
+    let result = generate(xml, target, nightly)?;
 
-    writeln!(File::create(output_file_name).unwrap(), "{}", quote!(#(#items)*)).unwrap();
+    writeln!(File::create(output_file_name).unwrap(), "{}", result.code).unwrap();
 
-    if target == Target::CortexM {
-        writeln!(File::create("device.x").unwrap(), "{}", device_x).unwrap();
-        writeln!(File::create("build.rs").unwrap(), "{}", build_rs()).unwrap();
+    if let Some(device_specific) = result.device_specific {
+        writeln!(File::create("device.x").unwrap(), "{}", device_specific.device_x).unwrap();
+        writeln!(File::create("build.rs").unwrap(), "{}", device_specific.build_rs).unwrap();
     }
 
     Ok(())
